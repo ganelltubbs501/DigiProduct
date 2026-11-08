@@ -10,7 +10,7 @@ type Row = { id: string; name: string; platform: string; audience_size: number; 
 
 export default async function PartnersPage() {
   const user = await requireUser();
-  const partners = all<Row>("SELECT id, name, platform, audience_size, niche, stage, split_pct, updated_at FROM partners WHERE user_id = ? ORDER BY updated_at DESC", user.id);
+  const partners = await all<Row>("SELECT id, name, platform, audience_size, niche, stage, split_pct, updated_at FROM partners WHERE user_id = ? ORDER BY updated_at DESC", user.id);
   return (
     <>
       <div className="page-head">

@@ -1,3 +1,6 @@
+// AI streams can run for minutes; raise the serverless timeout (Vercel caps it by plan).
+export const maxDuration = 300;
+
 import { currentUser } from "@/lib/auth";
 import { all, id, now, run } from "@/lib/db";
 import { streamText, textResponse, type ChatTurn } from "@/lib/ai";
@@ -12,11 +15,11 @@ export async function POST(req: Request) {
   const text = (message ?? "").trim().slice(0, 8000);
   if (!text) return new Response("Empty message", { status: 400 });
 
-  run("INSERT INTO coach_messages (id, user_id, role, content, created_at) VALUES (?, ?, 'user', ?, ?)", id(), user.id, text, now());
-  const history = all<ChatTurn>("SELECT role, content FROM coach_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 20", user.id).reverse();
+  await run("INSERT INTO coach_messages (id, user_id, role, content, created_at) VALUES (?, ?, 'user', ?, ?)", id(), user.id, text, now());
+  const history = (await all<ChatTurn>("SELECT role, content FROM coach_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 20", user.id)).reverse();
 
-  const j = journey(user.id);
-  const products = all<{ title: string; status: string; price_cents: number; audience: string }>("SELECT title, status, price_cents, audience FROM products WHERE user_id = ?", user.id);
+  const j = await journey(user.id);
+  const products = await all<{ title: string; status: string; price_cents: number; audience: string }>("SELECT title, status, price_cents, audience FROM products WHERE user_id = ?", user.id);
   const next = nextStep(j);
   const tools = "Demand Lab (/research), Products (/products), Launch Studio (/studio), Audience Finder (/distribution), Partner CRM (/partners), Sales (/sales), Launch Review (/review), Academy (/academy)";
 
@@ -37,8 +40,8 @@ What you know about this user (live data):
     maxTokens: 16000,
     messages: history,
     demo: () => `Demo mode: set ANTHROPIC_API_KEY for real coaching.\n\nBased on your progress, your next step is **${next?.label ?? "building your next product"}**. Open ${next?.href ?? "/research"} to do it. You asked: "${text.slice(0, 140)}". In general, start from demand: find where buyers already complain, pick a narrow promise, and ship a small version fast.`,
-    onDone: (reply) => {
-      run("INSERT INTO coach_messages (id, user_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)", id(), user.id, reply.trim(), now());
+    onDone: async (reply) => {
+      await run("INSERT INTO coach_messages (id, user_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)", id(), user.id, reply.trim(), now());
     },
   });
   return textResponse(stream);

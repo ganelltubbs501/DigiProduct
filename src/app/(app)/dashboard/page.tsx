@@ -8,12 +8,12 @@ export const metadata = { title: "Dashboard" };
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const j = journey(user.id);
+  const j = await journey(user.id);
   const steps = checklist(j);
   const next = nextStep(j);
   const done = steps.filter((s) => s.done).length;
   const challengeDay = Math.min(90, daysSince(user.challenge_started_at) + 1);
-  const recent = all<{ title: string; buyer_email: string; amount_cents: number; created_at: string; test_mode: number }>(
+  const recent = await all<{ title: string; buyer_email: string; amount_cents: number; created_at: string; test_mode: number }>(
     `SELECT p.title, o.buyer_email, o.amount_cents, o.created_at, o.test_mode FROM orders o JOIN products p ON p.id = o.product_id
      WHERE p.user_id = ? AND o.status = 'paid' ORDER BY o.created_at DESC LIMIT 5`,
     user.id,

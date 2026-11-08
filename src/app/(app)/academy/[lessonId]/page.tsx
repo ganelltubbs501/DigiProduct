@@ -13,7 +13,7 @@ export default async function LessonPage({ params }: { params: Promise<{ lessonI
   if (idx < 0) notFound();
   const lesson = ALL_LESSONS[idx];
   const stage = CURRICULUM.find((s) => s.lessons.includes(lesson))!;
-  const done = Boolean(get("SELECT 1 FROM lesson_progress WHERE user_id = ? AND lesson_id = ?", user.id, lesson.id));
+  const done = Boolean(await get("SELECT 1 FROM lesson_progress WHERE user_id = ? AND lesson_id = ?", user.id, lesson.id));
   const next = ALL_LESSONS[idx + 1];
 
   return (

@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { generateObject } from "./ai";
+import { AIError, generateObject, researchWeb, webResearchEnabled, type Source } from "./ai";
 
 const ChannelSchema = z.object({
   name: z.string().describe("Specific community, e.g. 'r/Etsy' or 'Notion Creators Discord'"),
@@ -17,14 +17,32 @@ const FinderSchema = z.object({
   creator_types: z.array(z.string()).describe("Kinds of creators whose audience matches, for partnerships"),
   warnings: z.array(z.string()),
 });
-export type FinderResult = z.infer<typeof FinderSchema>;
+export type FinderResult = z.infer<typeof FinderSchema> & { sources?: Source[]; researched?: boolean };
 
 export async function findAudiences(p: { title: string; audience: string; problem: string; promise: string }): Promise<FinderResult> {
-  return generateObject({
+  const brief = `Product: ${p.title}\nBuyer: ${p.audience}\nProblem: ${p.problem}\nPromise: ${p.promise}`;
+  let research: { notes: string; sources: Source[] } | null = null;
+  const warnings: string[] = [];
+  if (webResearchEnabled()) {
+    try {
+      research = await researchWeb({
+        system: `You find where buyers for a digital product already gather online. Search the web for specific, currently active communities: subreddits, forums, Facebook groups, Discord servers, newsletters, YouTube channels, podcasts, hashtags and marketplaces. For each, note its exact name, URL, approximate size (members/subscribers) as shown on the page, how active it looks, and whether it allows self-promotion. Also note creators in the niche with an audience but no product of their own.`,
+        prompt: brief,
+        maxSearches: 8,
+      });
+    } catch (err) {
+      warnings.push(`Web research failed (${err instanceof AIError ? err.message : "unknown error"}); these suggestions come from model knowledge only.`);
+    }
+  }
+  const result = await generateObject({
     schema: FinderSchema,
     effort: "high",
-    system: `You find where buyers for a digital product already gather online: subreddits, forums, Facebook groups, Discord servers, newsletters, YouTube channels, hashtags, marketplaces. Return 10-15 specific channels. You cannot browse, so member counts are estimates from your knowledge; mark them as rough and set url to "" when unsure. Emphasise free, rules-respecting ways to contribute value. Warn about communities that ban self-promotion.`,
-    prompt: `Product: ${p.title}\nBuyer: ${p.audience}\nProblem: ${p.problem}\nPromise: ${p.promise}`,
+    system: `You find where buyers for a digital product already gather online: subreddits, forums, Facebook groups, Discord servers, newsletters, YouTube channels, hashtags, marketplaces. Return 10-15 specific channels. ${
+      research
+        ? "Use the research notes: prefer channels the research actually found, use the URLs and sizes it reported, and set url to \"\" and est_audience to 0 when the notes don't give them. Don't invent communities."
+        : "You have no live data, so member counts are rough estimates from your knowledge; set url to \"\" when unsure."
+    } Emphasise free, rules-respecting ways to contribute value. Warn about communities that ban self-promotion.`,
+    prompt: `${brief}${research ? `\n\nResearch notes from a web search just now:\n${research.notes}` : ""}`,
     demo: () => ({
       search_queries: [`"${p.audience}" subreddit`, `${p.problem} facebook group`, `${p.title} discord`, `site:reddit.com "${p.problem}"`],
       channels: [
@@ -36,4 +54,5 @@ export async function findAudiences(p: { title: string; audience: string; proble
       warnings: ["Demo mode: set ANTHROPIC_API_KEY for real suggestions.", "Always read community rules before posting."],
     }),
   });
+  return { ...result, warnings: [...warnings, ...result.warnings], sources: research?.sources ?? [], researched: Boolean(research) };
 }

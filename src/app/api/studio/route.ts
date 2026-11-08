@@ -1,3 +1,6 @@
+// AI streams can run for minutes; raise the serverless timeout (Vercel caps it by plan).
+export const maxDuration = 300;
+
 import { currentUser } from "@/lib/auth";
 import { all, get, id, now, run } from "@/lib/db";
 import { streamText, textResponse } from "@/lib/ai";
@@ -10,13 +13,13 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { productId?: string; agent?: string; extra?: string };
   const agent = agentByKey(body.agent ?? "");
   if (!agent) return new Response("Unknown agent", { status: 400 });
-  const product = get<Product & { partner_name: string | null; partner_audience: number | null; partner_platform: string | null }>(
+  const product = await get<Product & { partner_name: string | null; partner_audience: number | null; partner_platform: string | null }>(
     `SELECT p.*, pa.name AS partner_name, pa.audience_size AS partner_audience, pa.platform AS partner_platform
      FROM products p LEFT JOIN partners pa ON pa.id = p.partner_id WHERE p.id = ? AND p.user_id = ?`,
     body.productId ?? "", user.id,
   );
   if (!product) return new Response("Product not found", { status: 404 });
-  const sections = all<{ title: string; brief: string }>("SELECT title, brief FROM sections WHERE product_id = ? ORDER BY position", product.id);
+  const sections = await all<{ title: string; brief: string }>("SELECT title, brief FROM sections WHERE product_id = ? ORDER BY position", product.id);
 
   const brief = [
     `Product: ${product.title} (${product.kind})`,
@@ -37,8 +40,8 @@ export async function POST(req: Request) {
     effort: "medium",
     messages: [{ role: "user", content: `${brief}\n\n${body.extra ? `Extra instructions from the seller: ${body.extra}` : ""}` }],
     demo: () => `# ${agent.name}: ${product.title}\n\n_Demo output: set ANTHROPIC_API_KEY to generate real copy._\n\n**Task:** ${agent.instructions}\n\n**For:** ${product.audience || "your buyer"}\n\n**Promise:** ${product.promise || product.tagline}\n\n- Point one about the result\n- Point two about the speed\n- Point three about who it's for\n`,
-    onDone: (text) => {
-      run("INSERT INTO assets (id, user_id, product_id, agent_key, title, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", id(), user.id, product.id, agent.key, agent.name, text.trim(), now());
+    onDone: async (text) => {
+      await run("INSERT INTO assets (id, user_id, product_id, agent_key, title, content, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", id(), user.id, product.id, agent.key, agent.name, text.trim(), now());
     },
   });
   return textResponse(stream);

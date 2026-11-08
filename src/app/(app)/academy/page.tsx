@@ -7,7 +7,7 @@ export const metadata = { title: "Academy" };
 
 export default async function Academy() {
   const user = await requireUser();
-  const done = new Set(all<{ lesson_id: string }>("SELECT lesson_id FROM lesson_progress WHERE user_id = ?", user.id).map((r) => r.lesson_id));
+  const done = new Set((await all<{ lesson_id: string }>("SELECT lesson_id FROM lesson_progress WHERE user_id = ?", user.id)).map((r) => r.lesson_id));
   return (
     <>
       <div className="page-head">

@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { aiEnabled, MODEL } from "@/lib/ai";
+import { aiEnabled, MODEL, webResearchEnabled } from "@/lib/ai";
 import { paymentsLive } from "@/lib/payments";
 import { saveSettings } from "@/app/actions/settings";
 
@@ -21,9 +21,11 @@ export default async function SettingsPage() {
         <h2>Integrations</h2>
         <table className="table"><tbody>
           <tr><td>Claude API</td><td><span className={`badge ${aiEnabled() ? "good" : "warn"}`}>{aiEnabled() ? `Connected (${MODEL})` : "Not set: demo mode"}</span></td></tr>
+          <tr><td>Live web research</td><td><span className={`badge ${webResearchEnabled() ? "good" : "warn"}`}>{webResearchEnabled() ? "On" : "Off"}</span></td></tr>
+          <tr><td>Database</td><td><span className="badge">{process.env.DATABASE_URL ? "Postgres (DATABASE_URL)" : "Embedded Postgres (local)"}</span></td></tr>
           <tr><td>Stripe payments</td><td><span className={`badge ${paymentsLive() ? "good" : "warn"}`}>{paymentsLive() ? "Live" : "Test mode"}</span></td></tr>
         </tbody></table>
-        <p className="small muted mt" style={{ marginBottom: 0 }}>Configure with environment variables: <code>ANTHROPIC_API_KEY</code>, <code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code>, <code>APP_URL</code>. See the README.</p>
+        <p className="small muted mt" style={{ marginBottom: 0 }}>Configure with environment variables: <code>ANTHROPIC_API_KEY</code>, <code>DATABASE_URL</code>, <code>DP_WEB_RESEARCH</code>, <code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code>, <code>APP_URL</code>. See the README.</p>
       </div>
     </div>
   );

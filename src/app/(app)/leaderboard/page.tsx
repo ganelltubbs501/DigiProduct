@@ -10,14 +10,14 @@ export default async function Leaderboard() {
   const user = await requireUser();
   const includeTest = paymentsLive() ? 0 : 1;
   // Revenue counts only orders inside each member's own 90-day window.
-  const rows = all<{ id: string; name: string; revenue: number; sales: number; started: string }>(
+  const rows = await all<{ id: string; name: string; revenue: number; sales: number; started: string }>(
     `SELECT u.id, u.name, u.challenge_started_at AS started,
        COALESCE(SUM(o.amount_cents), 0) AS revenue, COUNT(o.id) AS sales
      FROM users u
      LEFT JOIN products p ON p.user_id = u.id
      LEFT JOIN orders o ON o.product_id = p.id AND o.status = 'paid' AND (o.test_mode = 0 OR ? = 1)
-       AND o.created_at >= u.challenge_started_at
-       AND julianday(o.created_at) - julianday(u.challenge_started_at) <= 90
+       AND o.created_at::timestamptz >= u.challenge_started_at::timestamptz
+       AND o.created_at::timestamptz <= u.challenge_started_at::timestamptz + interval '90 days'
      WHERE u.leaderboard_opt_in = 1 OR u.id = ?
      GROUP BY u.id ORDER BY revenue DESC, sales DESC, u.created_at ASC LIMIT 100`,
     includeTest, user.id,

@@ -11,9 +11,9 @@ type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ new?:
 export default async function DownloadPage({ params, searchParams }: Props) {
   const { token } = await params;
   const { new: isNew } = await searchParams;
-  const order = orderByToken(token);
+  const order = await orderByToken(token);
   if (!order) notFound();
-  const product = get<Product>("SELECT * FROM products WHERE id = ?", order.product_id);
+  const product = await get<Product>("SELECT * FROM products WHERE id = ?", order.product_id);
   if (!product) notFound();
 
   if (order.status !== "paid") {
@@ -25,7 +25,7 @@ export default async function DownloadPage({ params, searchParams }: Props) {
     );
   }
 
-  const sections = productSections(product.id);
+  const sections = await productSections(product.id);
   return (
     <div style={{ maxWidth: 780, margin: "0 auto" }}>
       {isNew && <div className="notice info">Thank you for your purchase. Bookmark this page: it&apos;s your permanent access link.</div>}

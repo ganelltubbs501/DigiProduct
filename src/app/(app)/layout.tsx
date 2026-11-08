@@ -4,6 +4,8 @@ import { logout } from "@/app/actions/auth";
 import { Sidebar } from "@/app/components/Sidebar";
 
 export const dynamic = "force-dynamic";
+// AI server actions (outlines, research, reviews) run inside these pages.
+export const maxDuration = 300;
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();

@@ -10,7 +10,7 @@ export function NewTopicForm({ initialTopic }: { initialTopic: string }) {
   return (
     <form action={action} className="card" id="score">
       <h2>Score a topic</h2>
-      <p className="small muted">The AI estimates five signals from what it knows. Every number is editable, and the full formula is under "How the score is calculated".</p>
+      <p className="small muted">The AI searches the web for evidence (paid products, prices, reviews, communities, complaints), then estimates five signals from it. Every number is editable, and the full formula is under "How the score is calculated".</p>
       <div className="grid grid-2">
         <div className="field"><label>Topic</label><input type="text" name="topic" defaultValue={initialTopic} placeholder="e.g. Meal-prep system for night-shift nurses" required /></div>
         <div className="field"><label>About you or your partner <span className="hint">(optional)</span></label><input type="text" name="context" placeholder="e.g. I'm a nurse; partner has 40k IG followers" /></div>
@@ -60,6 +60,27 @@ export function TopicCard({ topic }: { topic: TopicRow }) {
           );
         })}
       </div>
+
+      {topic.estimate && (
+        <div className="small mt">
+          {topic.estimate.researched ? (
+            <span className="badge good">Based on live web research · {topic.estimate.sources?.length ?? 0} sources</span>
+          ) : (
+            <span className="badge warn">Estimated from model knowledge, not live data</span>
+          )}
+          {topic.estimate.research_note && <span className="muted"> {topic.estimate.research_note}</span>}
+          {topic.estimate.sources && topic.estimate.sources.length > 0 && (
+            <details style={{ marginTop: 6 }}>
+              <summary>Sources</summary>
+              <ul style={{ margin: "4px 0" }}>
+                {topic.estimate.sources.map((s) => (
+                  <li key={s.url}><a href={s.url} target="_blank" rel="noopener noreferrer nofollow">{s.title}</a></li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       {topic.estimate && (
         <div className="grid grid-2 mt">

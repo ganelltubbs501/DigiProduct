@@ -7,7 +7,7 @@ export const metadata = { title: "Products" };
 
 export default async function ProductsPage() {
   const user = await requireUser();
-  const products = userProducts(user.id);
+  const products = await userProducts(user.id);
   return (
     <>
       <div className="page-head">

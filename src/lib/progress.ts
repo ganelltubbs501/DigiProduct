@@ -1,5 +1,5 @@
 import "server-only";
-import { all, get } from "./db";
+import { all, count, get } from "./db";
 import { ALL_LESSONS } from "./curriculum";
 
 export type Journey = {
@@ -20,33 +20,33 @@ export type Journey = {
   firstPublishedAt: string | null;
 };
 
-const count = (sql: string, ...p: string[]) => get<{ n: number }>(sql, ...p)?.n ?? 0;
-
-export function journey(userId: string): Journey {
-  const words = all<{ content: string }>(
-    "SELECT s.content FROM sections s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?",
-    userId,
-  ).reduce((n, s) => n + (s.content.trim() ? s.content.trim().split(/\s+/).length : 0), 0);
-  const sales = get<{ n: number; total: number }>(
-    "SELECT COUNT(*) AS n, COALESCE(SUM(o.amount_cents),0) AS total FROM orders o JOIN products p ON p.id = o.product_id WHERE p.user_id = ? AND o.status = 'paid'",
-    userId,
-  );
+export async function journey(userId: string): Promise<Journey> {
+  const c = (sql: string) => count(sql, userId);
+  const [sections, sales, first, ideas, topics, products, published, assets, channels, channelsActive, partners, partnersSigned, lessonsDone] = await Promise.all([
+    all<{ content: string }>("SELECT s.content FROM sections s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?", userId),
+    get<{ n: number; total: number }>(
+      "SELECT COUNT(*) AS n, COALESCE(SUM(o.amount_cents),0) AS total FROM orders o JOIN products p ON p.id = o.product_id WHERE p.user_id = ? AND o.status = 'paid'",
+      userId,
+    ),
+    get<{ t: string | null }>("SELECT MIN(published_at) AS t FROM products WHERE user_id = ? AND published_at IS NOT NULL", userId),
+    c("SELECT COUNT(*) AS n FROM ideas WHERE user_id = ?"),
+    c("SELECT COUNT(*) AS n FROM topics WHERE user_id = ?"),
+    c("SELECT COUNT(*) AS n FROM products WHERE user_id = ?"),
+    c("SELECT COUNT(*) AS n FROM products WHERE user_id = ? AND status = 'published'"),
+    c("SELECT COUNT(*) AS n FROM assets WHERE user_id = ?"),
+    c("SELECT COUNT(*) AS n FROM channels WHERE user_id = ?"),
+    c("SELECT COUNT(*) AS n FROM channels WHERE user_id = ? AND status IN ('active','converting')"),
+    c("SELECT COUNT(*) AS n FROM partners WHERE user_id = ?"),
+    c("SELECT COUNT(*) AS n FROM partners WHERE user_id = ? AND stage IN ('signed','launched')"),
+    c("SELECT COUNT(*) AS n FROM lesson_progress WHERE user_id = ?"),
+  ]);
   return {
-    ideas: count("SELECT COUNT(*) AS n FROM ideas WHERE user_id = ?", userId),
-    topics: count("SELECT COUNT(*) AS n FROM topics WHERE user_id = ?", userId),
-    products: count("SELECT COUNT(*) AS n FROM products WHERE user_id = ?", userId),
-    published: count("SELECT COUNT(*) AS n FROM products WHERE user_id = ? AND status = 'published'", userId),
-    words,
-    assets: count("SELECT COUNT(*) AS n FROM assets WHERE user_id = ?", userId),
-    channels: count("SELECT COUNT(*) AS n FROM channels WHERE user_id = ?", userId),
-    channelsActive: count("SELECT COUNT(*) AS n FROM channels WHERE user_id = ? AND status IN ('active','converting')", userId),
-    partners: count("SELECT COUNT(*) AS n FROM partners WHERE user_id = ?", userId),
-    partnersSigned: count("SELECT COUNT(*) AS n FROM partners WHERE user_id = ? AND stage IN ('signed','launched')", userId),
+    ideas, topics, products, published, assets, channels, channelsActive, partners, partnersSigned, lessonsDone,
+    words: sections.reduce((n, s) => n + (s.content.trim() ? s.content.trim().split(/\s+/).length : 0), 0),
     orders: sales?.n ?? 0,
     revenueCents: sales?.total ?? 0,
-    lessonsDone: count("SELECT COUNT(*) AS n FROM lesson_progress WHERE user_id = ?", userId),
     lessonsTotal: ALL_LESSONS.length,
-    firstPublishedAt: get<{ t: string | null }>("SELECT MIN(published_at) AS t FROM products WHERE user_id = ? AND published_at IS NOT NULL", userId)?.t ?? null,
+    firstPublishedAt: first?.t ?? null,
   };
 }
 

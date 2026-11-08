@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { generateObject } from "./ai";
+import { AIError, generateObject, researchWeb, webResearchEnabled, type Source } from "./ai";
 import { SIGNALS, type Signals } from "./scoring";
 
 export const PRODUCT_KINDS = ["ebook", "template", "guide", "course", "toolkit", "workbook"] as const;
@@ -54,17 +54,42 @@ const SignalEstimateSchema = z.object({
   evidence_to_check: z.array(z.string()),
   sharper_angle: z.string().describe("A narrower, more sellable version of this topic"),
 });
-export type SignalEstimate = z.infer<typeof SignalEstimateSchema>;
+export type SignalEstimate = z.infer<typeof SignalEstimateSchema> & {
+  /** Pages the web research step read. Empty when estimated from model knowledge only. */
+  sources?: Source[];
+  researched?: boolean;
+  research_note?: string;
+};
 
 export async function estimateSignals(topic: string, context: string): Promise<SignalEstimate> {
   const rubric = SIGNALS.map((s) => `- ${s.key} (${s.label}): ${s.question} Evidence: ${s.evidence}`).join("\n");
-  return generateObject({
+
+  // Step 1: gather current evidence from the web (paid products, prices, reviews, communities, complaints).
+  let research: { notes: string; sources: Source[] } | null = null;
+  let researchNote = "";
+  if (webResearchEnabled()) {
+    try {
+      research = await researchWeb({
+        system: `You research market demand for a digital product topic. Search the web for concrete evidence on each of these signals:\n${rubric}\nLook for: existing paid products (marketplaces like Etsy, Gumroad, Udemy, Amazon Kindle) with prices and review counts; communities and their sizes; recurring questions and complaints; how crowded the market is. Report what you found as concise notes with numbers and the page each fact came from. Say clearly where evidence is thin.`,
+        prompt: `Topic: ${topic}\nSeller context: ${context || "(not given)"}`,
+      });
+    } catch (err) {
+      researchNote = `Web research failed (${err instanceof AIError ? err.message : "unknown error"}), so this estimate uses model knowledge only.`;
+    }
+  }
+
+  const est = await generateObject({
     schema: SignalEstimateSchema,
     effort: "high",
-    system: `You estimate demand signals for a digital product topic on a 0-10 scale using this rubric:\n${rubric}\nFor competition, 10 means extremely crowded. Be conservative: these are first-pass estimates the user will verify, so say what you are unsure of in the reasoning. Return one estimate for each of the five keys.`,
-    prompt: `Topic: ${topic}\nAbout me / my partner: ${context || "(not given)"}`,
+    system: `You estimate demand signals for a digital product topic on a 0-10 scale using this rubric:\n${rubric}\nFor competition, 10 means extremely crowded. ${
+      research
+        ? "Base every estimate on the research notes provided and mention the specific evidence (numbers, products, communities) in each reasoning. Where the notes have no evidence for a signal, say so and stay conservative."
+        : "You have no live data, so be conservative and say what you are unsure of in the reasoning."
+    } These are first-pass estimates the user will verify. Return one estimate for each of the five keys.`,
+    prompt: `Topic: ${topic}\nAbout me / my partner: ${context || "(not given)"}${research ? `\n\nResearch notes from a web search just now:\n${research.notes}` : ""}`,
     demo: () => demoSignals(topic),
   });
+  return { ...est, sources: research?.sources ?? [], researched: Boolean(research), research_note: researchNote || undefined };
 }
 
 export function estimatesToSignals(est: SignalEstimate): Signals {

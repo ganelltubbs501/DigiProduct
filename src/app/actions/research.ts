@@ -19,13 +19,13 @@ export async function generateIdeas(_: IdeasState, form: FormData): Promise<Idea
       input = { skills: f("skills"), experience: f("experience"), interests: f("interests") };
       if (!input.skills) return { error: "Tell us at least one skill." };
       result = await ideasFromSkills(input as { skills: string; experience: string; interests: string });
-      run("UPDATE users SET skills = ? WHERE id = ?", input.skills, user.id);
+      await run("UPDATE users SET skills = ? WHERE id = ?", input.skills, user.id);
     } else {
       input = { audience: f("audience"), expertise: f("expertise"), problem: f("problem"), result: f("result") };
       if (!input.audience) return { error: "Describe the audience." };
       result = await ideasFromBrief(input as { audience: string; expertise: string; problem: string; result: string });
     }
-    run("INSERT INTO ideas (id, user_id, mode, input_json, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", id(), user.id, mode, JSON.stringify(input), JSON.stringify(result), now());
+    await run("INSERT INTO ideas (id, user_id, mode, input_json, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?)", id(), user.id, mode, JSON.stringify(input), JSON.stringify(result), now());
     revalidatePath("/research");
     return { result };
   } catch (err) {
@@ -44,7 +44,7 @@ export async function scoreNewTopic(_: ScoreState, form: FormData): Promise<Scor
     const est = await estimateSignals(topic, context || user.skills);
     const signals = estimatesToSignals(est);
     const { score, breakdown } = scoreTopic(signals);
-    run(
+    await run(
       "INSERT INTO topics (id, user_id, name, signals_json, score, breakdown_json, rationale, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       id(), user.id, topic, JSON.stringify(signals), score, JSON.stringify(breakdown), JSON.stringify(est), now(),
     );
@@ -57,7 +57,7 @@ export async function scoreNewTopic(_: ScoreState, form: FormData): Promise<Scor
 
 export async function saveTopicSignals(topicId: string, signals: Signals) {
   const user = await requireUser();
-  if (!get("SELECT 1 FROM topics WHERE id = ? AND user_id = ?", topicId, user.id)) return;
+  if (!await get("SELECT 1 FROM topics WHERE id = ? AND user_id = ?", topicId, user.id)) return;
   const clean: Signals = {
     demand: clampSignal(signals.demand),
     intent: clampSignal(signals.intent),
@@ -66,12 +66,12 @@ export async function saveTopicSignals(topicId: string, signals: Signals) {
     fit: clampSignal(signals.fit),
   };
   const { score, breakdown } = scoreTopic(clean);
-  run("UPDATE topics SET signals_json = ?, score = ?, breakdown_json = ? WHERE id = ?", JSON.stringify(clean), score, JSON.stringify(breakdown), topicId);
+  await run("UPDATE topics SET signals_json = ?, score = ?, breakdown_json = ? WHERE id = ?", JSON.stringify(clean), score, JSON.stringify(breakdown), topicId);
   revalidatePath("/research");
 }
 
 export async function deleteTopic(form: FormData) {
   const user = await requireUser();
-  run("DELETE FROM topics WHERE id = ? AND user_id = ?", String(form.get("id")), user.id);
+  await run("DELETE FROM topics WHERE id = ? AND user_id = ?", String(form.get("id")), user.id);
   revalidatePath("/research");
 }

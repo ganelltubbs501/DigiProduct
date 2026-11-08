@@ -12,10 +12,10 @@ type Partner = { id: string; name: string; handle: string; platform: string; aud
 export default async function PartnerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
-  const p = get<Partner>("SELECT * FROM partners WHERE id = ? AND user_id = ?", id, user.id);
+  const p = await get<Partner>("SELECT * FROM partners WHERE id = ? AND user_id = ?", id, user.id);
   if (!p) notFound();
-  const activity = all<{ id: string; kind: string; note: string; created_at: string }>("SELECT * FROM partner_activities WHERE partner_id = ? ORDER BY created_at DESC", p.id);
-  const products = all<{ id: string; title: string; status: string; revenue: number; sales: number }>(
+  const activity = await all<{ id: string; kind: string; note: string; created_at: string }>("SELECT * FROM partner_activities WHERE partner_id = ? ORDER BY created_at DESC", p.id);
+  const products = await all<{ id: string; title: string; status: string; revenue: number; sales: number }>(
     `SELECT pr.id, pr.title, pr.status,
        (SELECT COALESCE(SUM(amount_cents),0) FROM orders o WHERE o.product_id = pr.id AND o.status = 'paid') AS revenue,
        (SELECT COUNT(*) FROM orders o WHERE o.product_id = pr.id AND o.status = 'paid') AS sales

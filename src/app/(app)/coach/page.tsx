@@ -7,7 +7,7 @@ export const metadata = { title: "Coach" };
 
 export default async function CoachPage() {
   const user = await requireUser();
-  const messages = all<{ role: "user" | "assistant"; content: string }>("SELECT role, content FROM coach_messages WHERE user_id = ? ORDER BY created_at ASC LIMIT 200", user.id);
+  const messages = await all<{ role: "user" | "assistant"; content: string }>("SELECT role, content FROM coach_messages WHERE user_id = ? ORDER BY created_at ASC LIMIT 200", user.id);
   return (
     <div style={{ maxWidth: 820 }}>
       <div className="page-head">

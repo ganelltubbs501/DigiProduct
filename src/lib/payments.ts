@@ -44,7 +44,7 @@ export async function startCheckout(product: Product, buyerEmail: string): Promi
   const s = getStripe();
 
   if (!s) {
-    run(
+    await run(
       "INSERT INTO orders (id, product_id, buyer_email, amount_cents, status, download_token, test_mode, created_at) VALUES (?, ?, ?, ?, 'paid', ?, 1, ?)",
       orderId,
       product.id,
@@ -56,7 +56,7 @@ export async function startCheckout(product: Product, buyerEmail: string): Promi
     return `/download/${token}?new=1`;
   }
 
-  run(
+  await run(
     "INSERT INTO orders (id, product_id, buyer_email, amount_cents, status, download_token, test_mode, created_at) VALUES (?, ?, ?, ?, 'pending', ?, 0, ?)",
     orderId,
     product.id,
@@ -82,7 +82,7 @@ export async function startCheckout(product: Product, buyerEmail: string): Promi
     success_url: `${baseUrl()}/api/checkout/confirm?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${baseUrl()}/p/${product.slug}?cancelled=1`,
   });
-  run("UPDATE orders SET stripe_session_id = ? WHERE id = ?", session.id, orderId);
+  await run("UPDATE orders SET stripe_session_id = ? WHERE id = ?", session.id, orderId);
   if (!session.url) throw new Error("Stripe did not return a checkout URL");
   return session.url;
 }
@@ -92,10 +92,10 @@ export async function confirmCheckout(sessionId: string): Promise<Order | null> 
   const s = getStripe();
   if (!s) return null;
   const session = await s.checkout.sessions.retrieve(sessionId);
-  const order = get<Order>("SELECT * FROM orders WHERE stripe_session_id = ?", session.id);
+  const order = await get<Order>("SELECT * FROM orders WHERE stripe_session_id = ?", session.id);
   if (!order) return null;
   if (session.payment_status === "paid" && order.status !== "paid") {
-    run("UPDATE orders SET status = 'paid' WHERE id = ?", order.id);
+    await run("UPDATE orders SET status = 'paid' WHERE id = ?", order.id);
     order.status = "paid";
   }
   return order;
@@ -109,10 +109,10 @@ export async function handleWebhook(rawBody: string, signature: string | null): 
   const event = s.webhooks.constructEvent(rawBody, signature, secret);
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    if (session.payment_status === "paid") run("UPDATE orders SET status = 'paid' WHERE stripe_session_id = ?", session.id);
+    if (session.payment_status === "paid") await run("UPDATE orders SET status = 'paid' WHERE stripe_session_id = ?", session.id);
   }
 }
 
-export function orderByToken(token: string): Order | undefined {
-  return get<Order>("SELECT * FROM orders WHERE download_token = ?", token);
+export async function orderByToken(token: string): Promise<Order | undefined> {
+  return await get<Order>("SELECT * FROM orders WHERE download_token = ?", token);
 }

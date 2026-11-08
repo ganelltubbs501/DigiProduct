@@ -7,7 +7,7 @@ export const metadata = { title: "Sales" };
 
 export default async function SalesPage() {
   const user = await requireUser();
-  const orders = all<{ id: string; title: string; buyer_email: string; amount_cents: number; status: string; created_at: string; test_mode: number; partner: string | null; split_pct: number | null }>(
+  const orders = await all<{ id: string; title: string; buyer_email: string; amount_cents: number; status: string; created_at: string; test_mode: number; partner: string | null; split_pct: number | null }>(
     `SELECT o.id, p.title, o.buyer_email, o.amount_cents, o.status, o.created_at, o.test_mode, pa.name AS partner, pa.split_pct
      FROM orders o JOIN products p ON p.id = o.product_id LEFT JOIN partners pa ON pa.id = p.partner_id
      WHERE p.user_id = ? ORDER BY o.created_at DESC LIMIT 500`,

@@ -32,27 +32,27 @@ export type Section = {
   updated_at: string;
 };
 
-export function ownedProduct(userId: string, productId: string): Product | undefined {
-  return get<Product>("SELECT * FROM products WHERE id = ? AND user_id = ?", productId, userId);
+export async function ownedProduct(userId: string, productId: string): Promise<Product | undefined> {
+  return await get<Product>("SELECT * FROM products WHERE id = ? AND user_id = ?", productId, userId);
 }
 
-export function userProducts(userId: string): (Product & { orders: number; revenue_cents: number; words: number })[] {
-  const rows = all<Product & { orders: number; revenue_cents: number }>(
+export async function userProducts(userId: string): Promise<(Product & { orders: number; revenue_cents: number; words: number })[]> {
+  const rows = await all<Product & { orders: number; revenue_cents: number }>(
     `SELECT p.*,
        (SELECT COUNT(*) FROM orders o WHERE o.product_id = p.id AND o.status = 'paid') AS orders,
        (SELECT COALESCE(SUM(amount_cents),0) FROM orders o WHERE o.product_id = p.id AND o.status = 'paid') AS revenue_cents
      FROM products p WHERE p.user_id = ? ORDER BY p.created_at DESC`,
     userId,
   );
-  return rows.map((r) => ({ ...r, words: productWords(r.id) }));
+  return Promise.all(rows.map(async (r) => ({ ...r, words: await productWords(r.id) })));
 }
 
-export function productSections(productId: string): Section[] {
-  return all<Section>("SELECT * FROM sections WHERE product_id = ? ORDER BY position", productId);
+export async function productSections(productId: string): Promise<Section[]> {
+  return await all<Section>("SELECT * FROM sections WHERE product_id = ? ORDER BY position", productId);
 }
 
-export function productWords(productId: string): number {
-  return productSections(productId).reduce((n, s) => n + wordCount(s.content), 0);
+export async function productWords(productId: string): Promise<number> {
+  return (await productSections(productId)).reduce((n, s) => n + wordCount(s.content), 0);
 }
 
 export function productOutline(p: Product): Outline | null {
@@ -81,11 +81,11 @@ export function slugify(text: string): string {
   return base || "product";
 }
 
-export function uniqueSlug(title: string, excludeId?: string): string {
+export async function uniqueSlug(title: string, excludeId?: string): Promise<string> {
   const base = slugify(title);
   let slug = base;
   let n = 2;
-  while (get("SELECT 1 FROM products WHERE slug = ? AND id != ?", slug, excludeId ?? "")) slug = `${base}-${n++}`;
+  while (await get("SELECT 1 FROM products WHERE slug = ? AND id != ?", slug, excludeId ?? "")) slug = `${base}-${n++}`;
   return slug;
 }
 

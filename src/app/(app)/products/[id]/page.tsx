@@ -13,15 +13,15 @@ import { ConfirmButton } from "@/app/components/ConfirmButton";
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireUser();
-  const p = ownedProduct(user.id, id);
+  const p = await ownedProduct(user.id, id);
   if (!p) notFound();
-  const sections = productSections(p.id);
+  const sections = await productSections(p.id);
   const outline = productOutline(p);
   const words = sections.reduce((n, s) => n + wordCount(s.content), 0);
   const drafted = sections.filter((s) => wordCount(s.content) > 0).length;
-  const partners = all<{ id: string; name: string; split_pct: number }>("SELECT id, name, split_pct FROM partners WHERE user_id = ? ORDER BY name", user.id);
-  const sales = get<{ n: number; total: number }>("SELECT COUNT(*) AS n, COALESCE(SUM(amount_cents),0) AS total FROM orders WHERE product_id = ? AND status = 'paid'", p.id)!;
-  const assets = get<{ n: number }>("SELECT COUNT(*) AS n FROM assets WHERE product_id = ?", p.id)!.n;
+  const partners = await all<{ id: string; name: string; split_pct: number }>("SELECT id, name, split_pct FROM partners WHERE user_id = ? ORDER BY name", user.id);
+  const sales = (await get<{ n: number; total: number }>("SELECT COUNT(*) AS n, COALESCE(SUM(amount_cents),0) AS total FROM orders WHERE product_id = ? AND status = 'paid'", p.id))!;
+  const assets = (await get<{ n: number }>("SELECT COUNT(*) AS n FROM assets WHERE product_id = ?", p.id))!.n;
   const partner = partners.find((x) => x.id === p.partner_id);
 
   return (

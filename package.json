@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
+    "@electric-sql/pglite": "^0.5.15",
     "marked": "^15.0.12",
     "next": "^15.5.29",
+    "postgres": "^3.4.9",
     "react": "^19.1.10",
     "react-dom": "^19.1.10",
     "server-only": "^0.0.1",

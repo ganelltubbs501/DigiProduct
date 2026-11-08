@@ -11,7 +11,7 @@ export const metadata = { title: "Launch Studio" };
 
 export default async function StudioPage({ searchParams }: { searchParams: Promise<{ product?: string }> }) {
   const user = await requireUser();
-  const products = all<{ id: string; title: string }>("SELECT id, title FROM products WHERE user_id = ? ORDER BY created_at DESC", user.id);
+  const products = await all<{ id: string; title: string }>("SELECT id, title FROM products WHERE user_id = ? ORDER BY created_at DESC", user.id);
   const { product } = await searchParams;
   const selected = products.find((p) => p.id === product) ?? products[0];
 
@@ -23,7 +23,7 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
       </>
     );
 
-  const assets = all<{ id: string; agent_key: string; title: string; content: string; created_at: string }>(
+  const assets = await all<{ id: string; agent_key: string; title: string; content: string; created_at: string }>(
     "SELECT id, agent_key, title, content, created_at FROM assets WHERE product_id = ? AND user_id = ? ORDER BY created_at DESC",
     selected.id, user.id,
   );

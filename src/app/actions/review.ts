@@ -11,9 +11,9 @@ export type ReviewState = { error?: string } | undefined;
 
 export async function runReview(_: ReviewState, form: FormData): Promise<ReviewState> {
   const user = await requireUser();
-  const p = ownedProduct(user.id, String(form.get("product_id")));
+  const p = await ownedProduct(user.id, String(form.get("product_id")));
   if (!p) return { error: "Pick a product." };
-  const sections = productSections(p.id);
+  const sections = await productSections(p.id);
   try {
     const report = await reviewLaunch({
       title: p.title,
@@ -27,11 +27,11 @@ export async function runReview(_: ReviewState, form: FormData): Promise<ReviewS
       sectionTitles: sections.map((s) => s.title),
       wordCount: sections.reduce((n, s) => n + wordCount(s.content), 0),
       daysLive: daysSince(p.published_at),
-      orders: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE product_id = ? AND status = 'paid'", p.id)!.n,
-      channels: all<{ name: string; status: string }>("SELECT name, status FROM channels WHERE product_id = ?", p.id),
-      assets: all<{ title: string }>("SELECT title FROM assets WHERE product_id = ?", p.id).map((a) => a.title),
+      orders: (await get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE product_id = ? AND status = 'paid'", p.id))!.n,
+      channels: await all<{ name: string; status: string }>("SELECT name, status FROM channels WHERE product_id = ?", p.id),
+      assets: (await all<{ title: string }>("SELECT title FROM assets WHERE product_id = ?", p.id)).map((a) => a.title),
     });
-    run("INSERT INTO reviews (id, user_id, product_id, report_json, created_at) VALUES (?, ?, ?, ?, ?)", id(), user.id, p.id, JSON.stringify(report), now());
+    await run("INSERT INTO reviews (id, user_id, product_id, report_json, created_at) VALUES (?, ?, ?, ?, ?)", id(), user.id, p.id, JSON.stringify(report), now());
     revalidatePath("/review");
     return {};
   } catch (err) {

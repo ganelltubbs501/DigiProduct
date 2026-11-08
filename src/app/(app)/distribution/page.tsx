@@ -12,13 +12,13 @@ const TONE: Record<string, string> = { idea: "", researching: "warn", active: "o
 
 export default async function DistributionPage({ searchParams }: { searchParams: Promise<{ product?: string }> }) {
   const user = await requireUser();
-  const products = all<{ id: string; title: string }>("SELECT id, title FROM products WHERE user_id = ? ORDER BY created_at DESC", user.id);
+  const products = await all<{ id: string; title: string }>("SELECT id, title FROM products WHERE user_id = ? ORDER BY created_at DESC", user.id);
   const { product } = await searchParams;
   const selected = products.find((p) => p.id === product) ?? products[0];
   if (!selected)
     return (<><h1>Audience Finder</h1><div className="card"><p>Create a product first.</p><Link className="btn primary" href="/products/new">New product</Link></div></>);
 
-  const channels = all<{ id: string; name: string; platform: string; url: string; est_audience: number; fit_notes: string; angle: string; status: string }>(
+  const channels = await all<{ id: string; name: string; platform: string; url: string; est_audience: number; fit_notes: string; angle: string; status: string }>(
     "SELECT * FROM channels WHERE product_id = ? AND user_id = ? ORDER BY CASE status WHEN 'converting' THEN 0 WHEN 'active' THEN 1 WHEN 'researching' THEN 2 WHEN 'idea' THEN 3 ELSE 4 END, est_audience DESC",
     selected.id, user.id,
   );

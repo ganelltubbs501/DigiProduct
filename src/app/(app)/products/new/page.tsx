@@ -7,7 +7,7 @@ export const metadata = { title: "New product" };
 
 export default async function NewProduct() {
   const user = await requireUser();
-  const partners = all<{ id: string; name: string }>("SELECT id, name FROM partners WHERE user_id = ? ORDER BY name", user.id);
+  const partners = await all<{ id: string; name: string }>("SELECT id, name FROM partners WHERE user_id = ? ORDER BY name", user.id);
   return (
     <div style={{ maxWidth: 720 }}>
       <h1>New product</h1>

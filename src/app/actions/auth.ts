@@ -12,14 +12,14 @@ export async function signup(_: FormState, form: FormData): Promise<FormState> {
   if (!/^\S+@\S+\.\S+$/.test(email)) return { error: "Enter a valid email." };
   if (!name) return { error: "Enter your name." };
   if (password.length < 8) return { error: "Password must be at least 8 characters." };
-  if (get("SELECT 1 FROM users WHERE email = ?", email.toLowerCase())) return { error: "An account with that email already exists." };
-  const userId = createUser(email, name, password);
+  if (await get("SELECT 1 FROM users WHERE email = ?", email.toLowerCase())) return { error: "An account with that email already exists." };
+  const userId = await createUser(email, name, password);
   await createSession(userId);
   redirect("/dashboard");
 }
 
 export async function login(_: FormState, form: FormData): Promise<FormState> {
-  const userId = findUserForLogin(String(form.get("email") ?? ""), String(form.get("password") ?? ""));
+  const userId = await findUserForLogin(String(form.get("email") ?? ""), String(form.get("password") ?? ""));
   if (!userId) return { error: "Wrong email or password." };
   await createSession(userId);
   redirect("/dashboard");

@@ -9,8 +9,8 @@ import { Cover } from "@/app/components/Cover";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ error?: string; cancelled?: string }> };
 
-function load(slug: string) {
-  return get<Product & { partner_name: string | null }>(
+async function load(slug: string) {
+  return await get<Product & { partner_name: string | null }>(
     `SELECT p.*, pa.name AS partner_name FROM products p LEFT JOIN partners pa ON pa.id = p.partner_id
      WHERE p.slug = ? AND p.status = 'published'`,
     slug,
@@ -18,16 +18,16 @@ function load(slug: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const p = load((await params).slug);
+  const p = await load((await params).slug);
   return p ? { title: p.title, description: p.tagline } : {};
 }
 
 export default async function StorePage({ params, searchParams }: Props) {
   const { slug } = await params;
   const sp = await searchParams;
-  const product = load(slug);
+  const product = await load(slug);
   if (!product) notFound();
-  const sections = productSections(product.id);
+  const sections = await productSections(product.id);
 
   return (
     <div className="grid" style={{ gridTemplateColumns: "minmax(0, 300px) minmax(0, 1fr)", gap: 36 }}>

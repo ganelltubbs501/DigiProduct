@@ -170,3 +170,53 @@ export function textResponse(stream: ReadableStream<Uint8Array>): Response {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" },
   });
 }
+
+export type Source = { title: string; url: string };
+export type WebResearch = { notes: string; sources: Source[] };
+
+/** Live web research is on whenever AI is on, unless DP_WEB_RESEARCH=off. */
+export function webResearchEnabled(): boolean {
+  return aiEnabled() && process.env.DP_WEB_RESEARCH !== "off";
+}
+
+/**
+ * Runs Claude with the web search tool and returns its research notes plus
+ * every page it looked at. Callers feed the notes into a structured step, so
+ * estimates rest on current evidence instead of the model's memory.
+ */
+export async function researchWeb(opts: { system: string; prompt: string; maxSearches?: number }): Promise<WebResearch> {
+  const messages: Anthropic.Beta.Messages.BetaMessageParam[] = [{ role: "user", content: opts.prompt }];
+  const sources = new Map<string, Source>();
+  let notes = "";
+  try {
+    // A long server-side search turn can pause; send it back (unchanged) to let it continue.
+    for (let turn = 0; turn < 4; turn++) {
+      const response = await getClient().beta.messages.create({
+        model: MODEL,
+        max_tokens: 16000,
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+        system: [
+          { type: "text", text: HOUSE_STYLE },
+          { type: "text", text: opts.system },
+        ],
+        output_config: { effort: "medium" },
+        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: opts.maxSearches ?? 6 }],
+        messages,
+      });
+      for (const block of response.content) {
+        if (block.type === "text") notes += block.text;
+        if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
+          for (const r of block.content) if (!sources.has(r.url)) sources.set(r.url, { title: r.title || r.url, url: r.url });
+        }
+      }
+      if (response.stop_reason === "refusal") throw new AIError("Claude declined this research request.");
+      if (response.stop_reason !== "pause_turn") break;
+      messages.push({ role: "assistant", content: response.content });
+    }
+  } catch (err) {
+    if (err instanceof AIError) throw err;
+    throw new AIError(describeError(err));
+  }
+  return { notes: notes.trim(), sources: [...sources.values()].slice(0, 25) };
+}

@@ -10,11 +10,11 @@ export const metadata = { title: "Demand Lab" };
 export default async function ResearchPage({ searchParams }: { searchParams: Promise<{ topic?: string }> }) {
   const user = await requireUser();
   const { topic = "" } = await searchParams;
-  const topics = all<{ id: string; name: string; signals_json: string; rationale: string; score: number }>(
+  const topics = await all<{ id: string; name: string; signals_json: string; rationale: string; score: number }>(
     "SELECT id, name, signals_json, rationale, score FROM topics WHERE user_id = ? ORDER BY score DESC, created_at DESC",
     user.id,
   );
-  const history = all<{ id: string; result_json: string; created_at: string; mode: string }>(
+  const history = await all<{ id: string; result_json: string; created_at: string; mode: string }>(
     "SELECT id, result_json, created_at, mode FROM ideas WHERE user_id = ? ORDER BY created_at DESC LIMIT 5",
     user.id,
   );

@@ -34,7 +34,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 export async function createSession(userId: string) {
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + SESSION_DAYS * 86400_000);
-  run("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)", token, userId, expires.toISOString());
+  await run("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)", token, userId, expires.toISOString());
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
@@ -48,7 +48,7 @@ export async function createSession(userId: string) {
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
-  if (token) run("DELETE FROM sessions WHERE token = ?", token);
+  if (token) await run("DELETE FROM sessions WHERE token = ?", token);
   jar.delete(COOKIE);
 }
 
@@ -56,7 +56,7 @@ export async function currentUser(): Promise<User | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
-  const user = get<User>(
+  const user = await get<User>(
     `SELECT u.id, u.email, u.name, u.skills, u.leaderboard_opt_in, u.challenge_started_at, u.created_at
      FROM sessions s JOIN users u ON u.id = s.user_id
      WHERE s.token = ? AND s.expires_at > ?`,
@@ -73,9 +73,9 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
-export function createUser(email: string, name: string, password: string): string {
+export async function createUser(email: string, name: string, password: string): Promise<string> {
   const userId = id();
-  run(
+  await run(
     "INSERT INTO users (id, email, name, password_hash, created_at, challenge_started_at) VALUES (?, ?, ?, ?, ?, ?)",
     userId,
     email.toLowerCase().trim(),
@@ -87,8 +87,8 @@ export function createUser(email: string, name: string, password: string): strin
   return userId;
 }
 
-export function findUserForLogin(email: string, password: string): string | null {
-  const row = get<{ id: string; password_hash: string }>(
+export async function findUserForLogin(email: string, password: string): Promise<string | null> {
+  const row = await get<{ id: string; password_hash: string }>(
     "SELECT id, password_hash FROM users WHERE email = ?",
     email.toLowerCase().trim(),
   );
